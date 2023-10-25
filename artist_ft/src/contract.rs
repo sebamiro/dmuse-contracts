@@ -9,14 +9,12 @@ use cw2::set_contract_version;
 use cw_ownable::initialize_owner;
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, MsgDto, QueryMsg};
+use crate::msg::{ExecuteMsg, MsgDto};
 use crate::state::DENOM;
 
 // version info for migration info
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-// ********** Instantiate **********
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -109,12 +107,16 @@ fn instantate_artist_ft(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps<CoreumQueries>, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps<CoreumQueries>, _env: Env, msg: Query) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Params {} => to_binary(&query_params(deps)?),
-        QueryMsg::Token {} => to_binary(&query_token(deps)?),
-        QueryMsg::Tokens { issuer } => to_binary(&query_tokens(deps, issuer)?),
-        QueryMsg::Balance { account } => to_binary(&query_balance(deps, account)?),
+        Query::Params {} => to_binary(&query_params(deps)?),
+        Query::Token { denom: _ } => to_binary(&query_token(deps)?),
+        Query::Tokens { pagination: _, issuer } => to_binary(&query_tokens(deps, issuer)?),
+        Query::Balance { account, denom: _ } => to_binary(&query_balance(deps, account)?),
+        Query::FrozenBalance { account, denom: _ } => to_binary(&query_balance(deps, account)?),
+        Query::FrozenBalances { pagination: _, account: _ } => to_binary(&query_token(deps)?),
+        Query::WhitelistedBalance { account, denom: _ } => to_binary(&query_balance(deps, account)?),
+        Query::WhitelistedBalances { pagination: _, account: _ } => to_binary(&query_token(deps)?),
     }
 }
 

@@ -12,10 +12,3 @@ pub enum ExecuteMsg {
     InstantiateArtistToken { artist: String },
 }
 
-#[cw_serde]
-pub enum QueryMsg {
-    Params,
-    Token,
-    Tokens { issuer: String },
-    Balance { account: String },
-}
