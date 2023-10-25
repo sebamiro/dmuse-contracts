@@ -1,9 +1,8 @@
 use coreum_wasm_sdk::assetnft::{
-    self, BurntNFTResponse, BurntNFTsInClassResponse, ClassResponse,
-    ClassesResponse
+    self, ClassResponse,
+    ClassesResponse, Query
 };
 use coreum_wasm_sdk::core::{ CoreumMsg, CoreumQueries, CoreumResult};
-use coreum_wasm_sdk::nft;
 use coreum_wasm_sdk::pagination::PageRequest;
 use cosmwasm_std::{
     entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo,
@@ -14,7 +13,7 @@ use cw_ownable::{ assert_owner, initialize_owner };
 
 use crate::error::ContractError;
 use crate::state::CLASS_ID;
-use crate::msg::{ ExecuteMsg, MsgDto, QueryMsg };
+use crate::msg::{ ExecuteMsg, MsgDto };
 
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -128,20 +127,16 @@ fn instantiate_collection(
 
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps<CoreumQueries>, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps<CoreumQueries>, _env: Env, msg: Query) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Param => to_binary(&query_params(deps)?),
-        QueryMsg::Class => to_binary(&query_class(deps)?),
-        QueryMsg::Classes { issuer } => to_binary(&query_classes(deps, issuer)?),
-        QueryMsg::Balance { owner } => to_binary(&query_balance(deps, owner)?),
-        QueryMsg::Owner { id } => to_binary(&query_owner(deps, id)?),
-        QueryMsg::Supply => to_binary(&query_supply(deps)?),
-        QueryMsg::Nft { id } => to_binary(&query_nft(deps, id)?),
-        QueryMsg::Nfts { owner } => to_binary(&query_nfts(deps, owner)?),
-        QueryMsg::ClassNft => to_binary(&query_nft_class(deps)?),
-        QueryMsg::ClassesNft => to_binary(&query_nft_classes(deps)?),
-        QueryMsg::BurnNft { nft_id } => to_binary(&query_burnt_nft(deps, nft_id)?),
-        QueryMsg::BurntNftsInClass => to_binary(&query_burnt_nfts_in_class(deps)?)
+        Query::Params {  } => to_binary(&query_params(deps)?),
+        Query::Class { id : _} => to_binary(&query_class(deps)?),
+        Query::Classes { pagination: _, issuer } => to_binary(&query_classes(deps, issuer)?),
+        Query::Frozen { id: _, class_id: _ } => to_binary(&query_params(deps)?),
+        Query::BurntNFT { class_id: _, nft_id : _} => to_binary(&query_params(deps)?),
+        Query::Whitelisted { id: _, class_id: _, account: _} => to_binary(&query_params(deps)?),
+        Query::BurntNFTsInClass { pagination: _, class_id : _ } => to_binary(&query_params(deps)?),
+        Query::WhitelistedAccountsForNFT { pagination : _, id : _, class_id : _ } => to_binary(&query_params(deps)?),
     }
 }
 
@@ -192,172 +187,3 @@ fn query_classes(deps: Deps<CoreumQueries>, issuer: String) -> StdResult<Classes
     Ok(res)
 }
 
-
-fn query_burnt_nft(deps: Deps<CoreumQueries>, nft_id: String) -> StdResult<BurntNFTResponse> {
-    let class_id = CLASS_ID.load(deps.storage)?;
-    let request: QueryRequest<CoreumQueries> =
-        CoreumQueries::AssetNFT(assetnft::Query::BurntNFT { class_id, nft_id }).into();
-    let res = deps.querier.query(&request)?;
-    Ok(res)
-}
-
-fn query_burnt_nfts_in_class(deps: Deps<CoreumQueries>) -> StdResult<BurntNFTsInClassResponse> {
-    let class_id = CLASS_ID.load(deps.storage)?;
-    let mut pagination = None;
-    let mut nft_ids = vec![];
-    let mut res: BurntNFTsInClassResponse;
-    loop {
-        let request = CoreumQueries::AssetNFT(assetnft::Query::BurntNFTsInClass {
-            pagination,
-            class_id: class_id.clone(),
-        })
-        .into();
-        res = deps.querier.query(&request)?;
-        nft_ids.append(&mut res.nft_ids);
-        if res.pagination.next_key.is_none() {
-            break;
-        } else {
-            pagination = Some(PageRequest {
-                key: res.pagination.next_key,
-                offset: None,
-                limit: None,
-                count_total: None,
-                reverse: None,
-            })
-        }
-    }
-    let res = BurntNFTsInClassResponse {
-        pagination: res.pagination,
-        nft_ids,
-    };
-    Ok(res)
-}
-
-fn query_balance(deps: Deps<CoreumQueries>, owner: String) -> StdResult<nft::BalanceResponse> {
-    let class_id = CLASS_ID.load(deps.storage)?;
-    let request: QueryRequest<CoreumQueries> =
-        CoreumQueries::NFT(nft::Query::Balance { class_id, owner }).into();
-    let res = deps.querier.query(&request)?;
-    Ok(res)
-}
-
-fn query_owner(deps: Deps<CoreumQueries>, id: String) -> StdResult<nft::OwnerResponse> {
-    let class_id = CLASS_ID.load(deps.storage)?;
-    let request: QueryRequest<CoreumQueries> =
-        CoreumQueries::NFT(nft::Query::Owner { class_id, id }).into();
-    let res = deps.querier.query(&request)?;
-    Ok(res)
-}
-
-fn query_supply(deps: Deps<CoreumQueries>) -> StdResult<nft::SupplyResponse> {
-    let class_id = CLASS_ID.load(deps.storage)?;
-    let request: QueryRequest<CoreumQueries> =
-        CoreumQueries::NFT(nft::Query::Supply { class_id }).into();
-    let res = deps.querier.query(&request)?;
-    Ok(res)
-}
-
-fn query_nft(deps: Deps<CoreumQueries>, id: String) -> StdResult<nft::NFTResponse> {
-    let class_id = CLASS_ID.load(deps.storage)?;
-    let request: QueryRequest<CoreumQueries> =
-        CoreumQueries::NFT(nft::Query::NFT { class_id, id }).into();
-    let res = deps.querier.query(&request)?;
-    Ok(res)
-}
-
-fn query_nfts(deps: Deps<CoreumQueries>, owner: Option<String>) -> StdResult<nft::NFTsResponse> {
-    let class_id = CLASS_ID.load(deps.storage)?;
-    let mut pagination = None;
-    let mut nfts = vec![];
-    let mut res: nft::NFTsResponse;
-    if owner.is_none() {
-        loop {
-            let request = CoreumQueries::NFT(nft::Query::NFTs {
-                class_id: Some(class_id.clone()),
-                owner: None,
-                pagination,
-            })
-            .into();
-            res = deps.querier.query(&request)?;
-            nfts.append(&mut res.nfts);
-            if res.pagination.next_key.is_none() {
-                break;
-            } else {
-                pagination = Some(PageRequest {
-                    key: res.pagination.next_key,
-                    offset: None,
-                    limit: None,
-                    count_total: None,
-                    reverse: None,
-                })
-            }
-        }
-        let res = nft::NFTsResponse {
-            nfts,
-            pagination: res.pagination,
-        };
-        Ok(res)
-    } else {
-        loop {
-            let request = CoreumQueries::NFT(nft::Query::NFTs {
-                class_id: None,
-                owner: Some(owner.clone().unwrap()),
-                pagination,
-            })
-            .into();
-            res = deps.querier.query(&request)?;
-            nfts.append(&mut res.nfts);
-            if res.pagination.next_key.is_none() {
-                break;
-            } else {
-                pagination = Some(PageRequest {
-                    key: res.pagination.next_key,
-                    offset: None,
-                    limit: None,
-                    count_total: None,
-                    reverse: None,
-                })
-            }
-        }
-        let res = nft::NFTsResponse {
-            nfts,
-            pagination: res.pagination,
-        };
-        Ok(res)
-    }
-}
-
-fn query_nft_class(deps: Deps<CoreumQueries>) -> StdResult<nft::ClassResponse> {
-    let class_id = CLASS_ID.load(deps.storage)?;
-    let request: QueryRequest<CoreumQueries> =
-        CoreumQueries::NFT(nft::Query::Class { class_id }).into();
-    let res = deps.querier.query(&request)?;
-    Ok(res)
-}
-
-fn query_nft_classes(deps: Deps<CoreumQueries>) -> StdResult<nft::ClassesResponse> {
-    let mut pagination = None;
-    let mut classes = vec![];
-    let mut res: nft::ClassesResponse;
-    loop {
-        let request = CoreumQueries::NFT(nft::Query::Classes { pagination }).into();
-        res = deps.querier.query(&request)?;
-        classes.append(&mut res.classes);
-        if res.pagination.next_key.is_none() {
-            break;
-        } else {
-            pagination = Some(PageRequest {
-                key: res.pagination.next_key,
-                offset: None,
-                limit: None,
-                count_total: None,
-                reverse: None,
-            })
-        }
-    }
-    let res = nft::ClassesResponse {
-        classes,
-        pagination: res.pagination,
-    };
-    Ok(res)
-}
