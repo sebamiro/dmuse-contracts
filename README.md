@@ -1,4 +1,4 @@
-# [dmuse](https://dmusic.mydurable.com/)
+# dmuse
 
 Dmuse is a blockchain based social platform that allows the user to support their
 favourite artist for real.git config pull.ff only
